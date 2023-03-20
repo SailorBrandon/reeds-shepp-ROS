@@ -1,7 +1,8 @@
 #include <ros/ros.h>
 #include <iostream>
 #include <vector>
-#include <nav_msgs/Path.h>
+#include <visualization_msgs/Marker.h>
+#include <visualization_msgs/MarkerArray.h>
 #include <geometry_msgs/PoseStamped.h>
 #include <tf/transform_datatypes.h>
 #include "rs_planner/reeds_shepp.h"
@@ -12,15 +13,14 @@ public:
     RSPlanner(ros::NodeHandle &nh)
     {
         goal_pose_sub = nh.subscribe("move_base_simple/goal", 1, &RSPlanner::goalPoseCallback, this);
-        forward_path_pub = nh.advertise<nav_msgs::Path>("/forwrad_path", 1);
-        backward_path_pub = nh.advertise<nav_msgs::Path>("/backward_path", 1);
+        vis_pub = nh.advertise<visualization_msgs::MarkerArray>("/vis_path", 1);
     }
     
 private:
     ros::Subscriber goal_pose_sub;
-    ros::Publisher backward_path_pub;
-    ros::Publisher forward_path_pub;
+    ros::Publisher vis_pub;
     void goalPoseCallback(const geometry_msgs::PoseStamped::ConstPtr& msg);
+    
 };
 
 void RSPlanner::goalPoseCallback(const geometry_msgs::PoseStamped::ConstPtr& msg)
@@ -32,33 +32,49 @@ void RSPlanner::goalPoseCallback(const geometry_msgs::PoseStamped::ConstPtr& msg
     double step_size = 0.1;
     std::vector<std::vector<double> > points;
     rs.sample(q0, q1, step_size, points);
-    nav_msgs::Path for_path_msg;
-    for_path_msg.header.frame_id = "/map";
-    for_path_msg.header.stamp = ros::Time::now();
-    nav_msgs::Path back_path_msg;
-    back_path_msg.header.frame_id = "/map";
-    back_path_msg.header.stamp = ros::Time::now();
+    visualization_msgs::MarkerArray path;
+    visualization_msgs::Marker marker;
+    marker.id = 0;
+    marker.ns = "path";
+    marker.action = visualization_msgs::Marker::DELETEALL;
+    path.markers.push_back(marker);
+    vis_pub.publish(path);
+    path.markers.resize(points.size());
     for (int i = 0; i < points.size(); i++)
     {
-        geometry_msgs::PoseStamped pose;
-        pose.header.frame_id = "/map";
-        pose.header.stamp = ros::Time::now();
-        pose.pose.position.x = points[i][0];
-        pose.pose.position.y = points[i][1];
-        pose.pose.orientation = tf::createQuaternionMsgFromYaw(points[i][2]);
+        visualization_msgs::Marker marker;
+        marker.header.frame_id = "map";
+        marker.header.stamp = ros::Time();
+        marker.type = visualization_msgs::Marker::SPHERE;
+        marker.action = visualization_msgs::Marker::ADD;
+        marker.id = i;
+        marker.pose.position.x = points[i][0];
+        marker.pose.position.y = points[i][1];
+        marker.pose.orientation = tf::createQuaternionMsgFromYaw(points[i][2]);
+        marker.scale.x = 0.1;
+        marker.scale.y = 0.1;
+        marker.scale.z = 0.1;
         if (points[i][4] > 0)
         {
-            for_path_msg.poses.push_back(pose);
-            ROS_INFO("Forward, x: %f, y: %f, yaw: %f", points[i][0], points[i][1], points[i][2]);
+            marker.ns = "forward";
+            marker.color.r = 0.0;
+            marker.color.g = 0.0;
+            marker.color.b = 1.0;
+            marker.color.a = 1.0;
+            ROS_INFO("forward, x: %f, y: %f, yaw: %f", points[i][0], points[i][1], points[i][2]);
         }
         else
         {
-            back_path_msg.poses.push_back(pose);
-            ROS_INFO("Backward, x: %f, y: %f, yaw: %f", points[i][0], points[i][1], points[i][2]);
+            marker.ns = "backward";
+            marker.color.r = 1.0;
+            marker.color.g = 0.0;
+            marker.color.b = 0.0;
+            marker.color.a = 1.0;
+            ROS_INFO("backward, x: %f, y: %f, yaw: %f", points[i][0], points[i][1], points[i][2]);
         }
+        path.markers[i] = marker;
     }
-    forward_path_pub.publish(for_path_msg);
-    backward_path_pub.publish(back_path_msg);
+    vis_pub.publish(path);
 }
 
 int main(int argc, char **argv)

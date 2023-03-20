@@ -1,7 +1,7 @@
 <launch>
 
     <node pkg="rs_planner" type="rs_planner_node" name="rs_planner_node" output="screen"/>
-    <!-- <node pkg="rs_planner" type="tf_broadcaster" name="tf_broadcaster" output="screen"/> -->
+    <node pkg="rs_planner" type="tf_broadcaster" name="tf_broadcaster" output="screen"/>
     <node pkg="rviz" type="rviz" name="rviz" args="-d $(find rs_planner)/rviz/try_rs_planner.rviz" output="screen"/>
 
 </launch>
